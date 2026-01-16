@@ -5,10 +5,15 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
-use crate::app::{AppState, FocusSection};
+use crate::app::{AppState, DraftField, DraftFocus, FocusSection, Screen};
 use crate::task::{Hypothesis, TaskPhase, TaskStatus};
 
 pub fn draw(frame: &mut Frame, app: &AppState) {
+    if app.screen == Screen::TaskInput {
+        draw_task_input_screen(frame, app);
+        return;
+    }
+
     let root = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -244,6 +249,153 @@ fn draw_help(frame: &mut Frame, area: Rect, _app: &AppState) {
         Span::raw(" quit"),
     ]);
     let block = Block::default().borders(Borders::ALL).title("Controls");
+    frame.render_widget(Paragraph::new(help).block(block), area);
+}
+
+fn draw_task_input_screen(frame: &mut Frame, app: &AppState) {
+    let root = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(8), Constraint::Length(3)])
+        .split(frame.size());
+
+    draw_header(frame, root[0]);
+
+    let main = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+        .split(root[1]);
+
+    draw_task_form(frame, main[0], app);
+    draw_hypothesis_panel(frame, main[1], app);
+    draw_task_input_help(frame, root[2], app);
+}
+
+fn draw_task_form(frame: &mut Frame, area: Rect, app: &AppState) {
+    let is_field_focus = app.draft.focus == DraftFocus::Fields;
+    let name_style = if is_field_focus && app.draft.field == DraftField::Name {
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let dataset_style = if is_field_focus && app.draft.field == DraftField::DatasetFolder {
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+
+    let lines = vec![
+        Line::from(Span::styled("Task Definition", Style::default().add_modifier(Modifier::BOLD))),
+        Line::from(""),
+        Line::from(vec![
+            Span::raw("Name: "),
+            Span::styled(
+                if app.draft.field == DraftField::Name {
+                    app.input.clone()
+                } else {
+                    app.draft.name.clone()
+                },
+                name_style,
+            ),
+        ]),
+        Line::from(vec![
+            Span::raw("Dataset folder: "),
+            Span::styled(
+                if app.draft.field == DraftField::DatasetFolder {
+                    app.input.clone()
+                } else {
+                    app.draft.dataset_folder.clone()
+                },
+                dataset_style,
+            ),
+        ]),
+        Line::from(""),
+        Line::from("Heuristics (mock):"),
+        Line::from(" - edge_threshold: 0.42"),
+        Line::from(" - min_blob_area: 120"),
+        Line::from(" - contrast_boost: 1.25"),
+    ];
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title("Task Input [Tab to switch]");
+    frame.render_widget(Paragraph::new(Text::from(lines)).block(block), area);
+}
+
+fn draw_hypothesis_panel(frame: &mut Frame, area: Rect, app: &AppState) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+        .split(area);
+
+    let hypothesis_items = app
+        .draft
+        .hypotheses
+        .iter()
+        .enumerate()
+        .map(|(idx, h)| {
+            let selected = idx == app.draft.selected_hypothesis;
+            let style = if app.draft.focus == DraftFocus::Hypotheses && selected {
+                Style::default().fg(Color::Green).add_modifier(Modifier::REVERSED)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Span::styled(truncate(&h.title, 36), style))
+        })
+        .collect::<Vec<_>>();
+
+    let hypothesis_list = List::new(hypothesis_items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Hypotheses [H]"),
+    );
+
+    frame.render_widget(hypothesis_list, chunks[0]);
+
+    let images = app
+        .draft
+        .hypotheses
+        .get(app.draft.selected_hypothesis)
+        .map(|h| h.images.as_slice())
+        .unwrap_or(&[]);
+
+    let image_items = if images.is_empty() {
+        vec![ListItem::new("none")]
+    } else {
+        images
+            .iter()
+            .enumerate()
+            .map(|(idx, img)| {
+                let selected = idx == app.draft.selected_image;
+                let style = if app.draft.focus == DraftFocus::Images && selected {
+                    Style::default().fg(Color::Green).add_modifier(Modifier::REVERSED)
+                } else {
+                    Style::default()
+                };
+                ListItem::new(Span::styled(img.clone(), style))
+            })
+            .collect()
+    };
+
+    let image_list = List::new(image_items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title("Images [I]"),
+    );
+    frame.render_widget(image_list, chunks[1]);
+}
+
+fn draw_task_input_help(frame: &mut Frame, area: Rect, _app: &AppState) {
+    let help = Line::from(vec![
+        Span::styled("Tab", Style::default().fg(Color::Yellow)),
+        Span::raw(" switch field  "),
+        Span::styled("Up/Down", Style::default().fg(Color::Yellow)),
+        Span::raw(" move lists  "),
+        Span::styled("Enter", Style::default().fg(Color::Yellow)),
+        Span::raw(" submit  "),
+        Span::styled("Esc", Style::default().fg(Color::Yellow)),
+        Span::raw(" cancel"),
+    ]);
+    let block = Block::default().borders(Borders::ALL).title("Task Input Controls");
     frame.render_widget(Paragraph::new(help).block(block), area);
 }
 

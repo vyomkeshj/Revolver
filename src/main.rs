@@ -16,7 +16,7 @@ use ratatui::Terminal;
 use tokio::sync::mpsc;
 use tokio::time::{interval, sleep};
 
-use crate::app::{AppState, FocusSection};
+use crate::app::{AppState, DraftFocus, DraftField, FocusSection, Screen};
 use crate::scheduler::{run_scheduler, SchedulerCommand};
 
 #[tokio::main]
@@ -62,6 +62,9 @@ async fn handle_event(
         if key.kind != KeyEventKind::Press {
             return Ok(false);
         }
+        if app.screen == Screen::TaskInput {
+            return handle_task_input(key.code, app, cmd_tx).await;
+        }
         if app.input_mode {
             match key.code {
                 KeyCode::Esc => {
@@ -92,8 +95,7 @@ async fn handle_event(
         match key.code {
             KeyCode::Char('q') => return Ok(true),
             KeyCode::Char('n') => {
-                app.input_mode = true;
-                app.set_focus(FocusSection::Input);
+                app.open_task_input();
             }
             KeyCode::Char('t') | KeyCode::Char('T') => {
                 app.set_focus(FocusSection::Tasks);
@@ -120,6 +122,78 @@ async fn handle_event(
             }
             _ => {}
         }
+    }
+    Ok(false)
+}
+
+async fn handle_task_input(
+    code: KeyCode,
+    app: &mut AppState,
+    cmd_tx: &mpsc::Sender<SchedulerCommand>,
+) -> io::Result<bool> {
+    match code {
+        KeyCode::Esc => {
+            app.close_task_input();
+        }
+        KeyCode::Tab => {
+            if app.draft.focus == DraftFocus::Fields {
+                app.commit_draft_field();
+                app.draft.field = match app.draft.field {
+                    DraftField::Name => DraftField::DatasetFolder,
+                    DraftField::DatasetFolder => DraftField::Name,
+                };
+                app.load_draft_field();
+            } else {
+                app.draft.focus = DraftFocus::Fields;
+                app.load_draft_field();
+            }
+        }
+        KeyCode::Up => {
+            if app.draft.focus == DraftFocus::Hypotheses && app.draft.selected_hypothesis > 0 {
+                app.draft.selected_hypothesis -= 1;
+                app.draft.selected_image = 0;
+            } else if app.draft.focus == DraftFocus::Images && app.draft.selected_image > 0 {
+                app.draft.selected_image -= 1;
+            }
+        }
+        KeyCode::Down => {
+            if app.draft.focus == DraftFocus::Hypotheses {
+                let max = app.draft.hypotheses.len().saturating_sub(1);
+                app.draft.selected_hypothesis =
+                    (app.draft.selected_hypothesis + 1).min(max);
+                app.draft.selected_image = 0;
+            } else if app.draft.focus == DraftFocus::Images {
+                if let Some(images) = app
+                    .draft
+                    .hypotheses
+                    .get(app.draft.selected_hypothesis)
+                    .map(|h| h.images.len())
+                {
+                    let max = images.saturating_sub(1);
+                    app.draft.selected_image = (app.draft.selected_image + 1).min(max);
+                }
+            }
+        }
+        KeyCode::Enter => {
+            app.commit_draft_field();
+            let name = app.draft.name.trim().to_string();
+            if !name.is_empty() {
+                let _ = cmd_tx.send(SchedulerCommand::AddTask { name }).await;
+            }
+            app.reset_draft();
+            app.close_task_input();
+        }
+        KeyCode::Backspace => {
+            if app.draft.focus == DraftFocus::Fields {
+                app.input.pop();
+            }
+        }
+        KeyCode::Char(ch) => {
+            if app.draft.focus == DraftFocus::Fields {
+                app.input.push(ch);
+            }
+        }
+        _ => {}
     }
     Ok(false)
 }
