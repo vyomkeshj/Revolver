@@ -4,33 +4,40 @@ use crate::scheduler::TaskUpdate;
 use crate::task::TaskSnapshot;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FocusSection {
-    Tasks,
-    Detail,
-    Input,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Screen {
+pub enum Activity {
     Main,
     TaskInput,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DraftFocus {
-    Fields,
-    Hypotheses,
-    Images,
+pub enum Fragment {
+    MainTasks,
+    MainDetail,
+    MainInput,
+    TaskDescription,
+    TaskHypotheses,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DraftField {
     Name,
     DatasetFolder,
+    Heuristics,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeuristicsFocus {
+    Titles,
+    Images,
 }
 
 #[derive(Debug, Clone)]
 pub struct HypothesisDraft {
+    pub title: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct HeuristicDraft {
     pub title: String,
     pub images: Vec<String>,
 }
@@ -39,11 +46,13 @@ pub struct HypothesisDraft {
 pub struct TaskDraft {
     pub name: String,
     pub dataset_folder: String,
+    pub heuristics: Vec<HeuristicDraft>,
     pub hypotheses: Vec<HypothesisDraft>,
     pub field: DraftField,
-    pub focus: DraftFocus,
     pub selected_hypothesis: usize,
+    pub selected_heuristic: usize,
     pub selected_image: usize,
+    pub heuristics_focus: HeuristicsFocus,
 }
 
 #[derive(Debug)]
@@ -51,11 +60,12 @@ pub struct AppState {
     tasks_by_id: HashMap<usize, TaskSnapshot>,
     order: Vec<usize>,
     pub selected: usize,
-    pub input_mode: bool,
     pub input: String,
-    pub focus: FocusSection,
-    pub screen: Screen,
+    pub activity: Activity,
+    pub fragment: Fragment,
     pub draft: TaskDraft,
+    pub cursor_pos: usize,
+    pub cursor_visible: bool,
     logs: Vec<String>,
 }
 
@@ -64,45 +74,46 @@ impl AppState {
         let draft = TaskDraft {
             name: String::new(),
             dataset_folder: String::from("./datasets/mock"),
-            hypotheses: vec![
-                HypothesisDraft {
-                    title: "Edge + blob fusion".to_string(),
-                    images: vec![
-                        "image_00.png".to_string(),
-                        "image_03.png".to_string(),
-                        "image_07.png".to_string(),
-                    ],
+            heuristics: vec![
+                HeuristicDraft {
+                    title: "Edge threshold".to_string(),
+                    images: vec!["/data/edge_01.png".to_string()],
                 },
-                HypothesisDraft {
-                    title: "Contrast boosted contours".to_string(),
+                HeuristicDraft {
+                    title: "Blob area filter".to_string(),
                     images: vec![
-                        "image_02.png".to_string(),
-                        "image_05.png".to_string(),
-                        "image_11.png".to_string(),
-                    ],
-                },
-                HypothesisDraft {
-                    title: "Texture density heuristic".to_string(),
-                    images: vec![
-                        "image_04.png".to_string(),
-                        "image_08.png".to_string(),
+                        "/data/blob_03.png".to_string(),
+                        "/data/blob_07.png".to_string(),
                     ],
                 },
             ],
+            hypotheses: vec![
+                HypothesisDraft {
+                    title: "Edge + blob fusion".to_string(),
+                },
+                HypothesisDraft {
+                    title: "Contrast boosted contours".to_string(),
+                },
+                HypothesisDraft {
+                    title: "Texture density heuristic".to_string(),
+                },
+            ],
             field: DraftField::Name,
-            focus: DraftFocus::Fields,
             selected_hypothesis: 0,
+            selected_heuristic: 0,
             selected_image: 0,
+            heuristics_focus: HeuristicsFocus::Titles,
         };
         Self {
             tasks_by_id: HashMap::new(),
             order: Vec::new(),
             selected: 0,
-            input_mode: false,
             input: String::new(),
-            focus: FocusSection::Tasks,
-            screen: Screen::Main,
+            activity: Activity::Main,
+            fragment: Fragment::MainTasks,
             draft,
+            cursor_pos: 0,
+            cursor_visible: true,
             logs: Vec::new(),
         }
     }
@@ -164,30 +175,31 @@ impl AppState {
         &self.logs
     }
 
-    pub fn set_focus(&mut self, focus: FocusSection) {
-        self.focus = focus;
+    pub fn set_fragment(&mut self, fragment: Fragment) {
+        self.fragment = fragment;
     }
 
     pub fn open_task_input(&mut self) {
-        self.screen = Screen::TaskInput;
-        self.input_mode = true;
-        self.focus = FocusSection::Input;
+        self.activity = Activity::TaskInput;
+        self.fragment = Fragment::TaskDescription;
         self.draft.field = DraftField::Name;
-        self.draft.focus = DraftFocus::Fields;
+        self.draft.heuristics_focus = HeuristicsFocus::Titles;
         self.input = self.draft.name.clone();
+        self.cursor_pos = self.input.len();
     }
 
     pub fn close_task_input(&mut self) {
-        self.screen = Screen::Main;
-        self.input_mode = false;
-        self.focus = FocusSection::Tasks;
+        self.activity = Activity::Main;
+        self.fragment = Fragment::MainTasks;
         self.input.clear();
+        self.cursor_pos = 0;
     }
 
     pub fn commit_draft_field(&mut self) {
         match self.draft.field {
             DraftField::Name => self.draft.name = self.input.clone(),
             DraftField::DatasetFolder => self.draft.dataset_folder = self.input.clone(),
+            DraftField::Heuristics => {}
         }
     }
 
@@ -195,16 +207,39 @@ impl AppState {
         self.input = match self.draft.field {
             DraftField::Name => self.draft.name.clone(),
             DraftField::DatasetFolder => self.draft.dataset_folder.clone(),
+            DraftField::Heuristics => String::new(),
         };
+        self.cursor_pos = self.input.len();
     }
 
     pub fn reset_draft(&mut self) {
         self.draft.name.clear();
         self.draft.dataset_folder = "./datasets/mock".to_string();
         self.draft.field = DraftField::Name;
-        self.draft.focus = DraftFocus::Fields;
         self.draft.selected_hypothesis = 0;
+        self.draft.selected_heuristic = 0;
         self.draft.selected_image = 0;
+        self.draft.heuristics_focus = HeuristicsFocus::Titles;
         self.input.clear();
+        self.cursor_pos = 0;
+    }
+
+    pub fn add_heuristic(&mut self, title: String) {
+        self.draft.heuristics.push(HeuristicDraft {
+            title,
+            images: vec!["/data/new_image.png".to_string()],
+        });
+        self.draft.selected_heuristic = self.draft.heuristics.len().saturating_sub(1);
+        self.draft.selected_image = 0;
+        self.cursor_pos = self
+            .draft
+            .heuristics
+            .get(self.draft.selected_heuristic)
+            .map(|h| h.title.len())
+            .unwrap_or(0);
+    }
+
+    pub fn toggle_cursor(&mut self) {
+        self.cursor_visible = !self.cursor_visible;
     }
 }

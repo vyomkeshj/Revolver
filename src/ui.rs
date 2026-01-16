@@ -5,11 +5,11 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, List, ListItem, Paragraph, Row, Table, TableState};
 use ratatui::Frame;
 
-use crate::app::{AppState, DraftField, DraftFocus, FocusSection, Screen};
+use crate::app::{Activity, AppState, DraftField, Fragment, HeuristicsFocus};
 use crate::task::{Hypothesis, TaskPhase, TaskStatus};
 
 pub fn draw(frame: &mut Frame, app: &AppState) {
-    if app.screen == Screen::TaskInput {
+    if app.activity == Activity::TaskInput {
         draw_task_input_screen(frame, app);
         return;
     }
@@ -31,19 +31,30 @@ pub fn draw(frame: &mut Frame, app: &AppState) {
 }
 
 pub fn draw_splash(frame: &mut Frame) {
-    let block = Block::default().borders(Borders::ALL).title("TheLastMachine");
+    let block = Block::default().borders(Borders::ALL).title("Revolver");
     let text = Text::from(vec![
-        Line::from(" TheLastMachine"),
+        Line::from(" Revolver"),
     ]);
     let paragraph = Paragraph::new(text)
         .block(block)
         .alignment(ratatui::layout::Alignment::Center);
-    frame.render_widget(paragraph, frame.size());
+    let area = frame.size();
+    let desired_height = 3u16;
+    let pad = area.height.saturating_sub(desired_height) / 2;
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(pad),
+            Constraint::Length(desired_height),
+            Constraint::Min(0),
+        ])
+        .split(area);
+    frame.render_widget(paragraph, layout[1]);
 }
 
 fn draw_header(frame: &mut Frame, area: Rect) {
     let text = Text::from(Line::from(Span::styled(
-        "TheLastMachine",
+        "Revolver",
         Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
     )));
     let block = Block::default().borders(Borders::ALL).title("Header");
@@ -82,18 +93,17 @@ fn draw_task_list(frame: &mut Frame, area: Rect, app: &AppState) {
         ])
     });
 
-    let title_style = if app.focus == FocusSection::Tasks {
+    let active = app.fragment == Fragment::MainTasks;
+    let title_style = if active {
         Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let highlight_style = Style::default()
-        .fg(Color::Green)
-        .add_modifier(Modifier::BOLD | Modifier::REVERSED);
-    let border_set = if app.focus == FocusSection::Tasks && !tasks.is_empty() {
-        dashed_border_set()
+    let highlight_style = selected_list_style();
+    let (border_set, border_style) = if active {
+        (dashed_border_set(), Style::default().fg(Color::Green))
     } else {
-        border::PLAIN
+        (border::PLAIN, Style::default())
     };
     let table = Table::new(rows, [
         Constraint::Length(4),
@@ -111,6 +121,7 @@ fn draw_task_list(frame: &mut Frame, area: Rect, app: &AppState) {
         Block::default()
             .borders(Borders::ALL)
             .border_set(border_set)
+            .border_style(border_style)
             .title(Span::styled("Tasks [T]", title_style)),
     );
 
@@ -179,13 +190,21 @@ fn draw_task_summary(frame: &mut Frame, area: Rect, app: &AppState) {
         Text::from("No tasks yet. Press 'n' to add a task.")
     };
 
-    let title_style = if app.focus == FocusSection::Detail {
+    let active = app.fragment == Fragment::MainDetail;
+    let title_style = if active {
         Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
+    let (border_set, border_style) = if active {
+        (dashed_border_set(), Style::default().fg(Color::Green))
+    } else {
+        (border::PLAIN, Style::default())
+    };
     let block = Block::default()
         .borders(Borders::ALL)
+        .border_set(border_set)
+        .border_style(border_style)
         .title(Span::styled("Task Detail [D]", title_style));
     frame.render_widget(Paragraph::new(content).block(block), area);
 }
@@ -214,24 +233,24 @@ fn draw_hypothesis_lists(frame: &mut Frame, area: Rect, app: &AppState) {
 }
 
 fn draw_input(frame: &mut Frame, area: Rect, app: &AppState) {
-    let title_style = if app.focus == FocusSection::Input {
+    let active = app.fragment == Fragment::MainInput;
+    let title_style = if active {
         Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let title = if app.input_mode {
-        "New Task (Enter to submit, Esc to cancel)"
+    let title = "Task Input [N]";
+    let (border_set, border_style) = if active {
+        (dashed_border_set(), Style::default().fg(Color::Green))
     } else {
-        "Task Input [N]"
+        (border::PLAIN, Style::default())
     };
     let block = Block::default()
         .borders(Borders::ALL)
+        .border_set(border_set)
+        .border_style(border_style)
         .title(Span::styled(title, title_style));
-    let value = if app.input_mode {
-        app.input.clone()
-    } else {
-        "Press 'n' to create a task.".to_string()
-    };
+    let value = "Press 'n' to open task input activity.".to_string();
     frame.render_widget(Paragraph::new(value).block(block), area);
 }
 
@@ -239,8 +258,8 @@ fn draw_help(frame: &mut Frame, area: Rect, _app: &AppState) {
     let help = Line::from(vec![
         Span::styled("n", Style::default().fg(Color::Yellow)),
         Span::raw(" new task  "),
-        Span::styled("t/d", Style::default().fg(Color::Yellow)),
-        Span::raw(" focus  "),
+        Span::styled("t/d/i", Style::default().fg(Color::Yellow)),
+        Span::raw(" fragment  "),
         Span::styled("j/k", Style::default().fg(Color::Yellow)),
         Span::raw(" move (tasks)  "),
         Span::styled("c", Style::default().fg(Color::Yellow)),
@@ -255,78 +274,233 @@ fn draw_help(frame: &mut Frame, area: Rect, _app: &AppState) {
 fn draw_task_input_screen(frame: &mut Frame, app: &AppState) {
     let root = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(3), Constraint::Min(8), Constraint::Length(3)])
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(12),
+            Constraint::Min(6),
+            Constraint::Length(3),
+        ])
         .split(frame.size());
 
     draw_header(frame, root[0]);
 
-    let main = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
-        .split(root[1]);
-
-    draw_task_form(frame, main[0], app);
-    draw_hypothesis_panel(frame, main[1], app);
-    draw_task_input_help(frame, root[2], app);
+    if let Some(cursor) = draw_task_description_fragment(frame, root[1], app) {
+        if app.cursor_visible {
+            frame.set_cursor(cursor.0, cursor.1);
+        }
+    }
+    draw_hypothesis_fragment(frame, root[2], app);
+    draw_task_input_help(frame, root[3], app);
 }
 
-fn draw_task_form(frame: &mut Frame, area: Rect, app: &AppState) {
-    let is_field_focus = app.draft.focus == DraftFocus::Fields;
-    let name_style = if is_field_focus && app.draft.field == DraftField::Name {
+fn draw_task_description_fragment(frame: &mut Frame, area: Rect, app: &AppState) -> Option<(u16, u16)> {
+    let is_active = app.fragment == Fragment::TaskDescription;
+    let title_style = if is_active {
         Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
     } else {
         Style::default()
     };
-    let dataset_style = if is_field_focus && app.draft.field == DraftField::DatasetFolder {
-        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+    let (border_set, border_style) = if is_active {
+        (dashed_border_set(), Style::default().fg(Color::Green))
     } else {
-        Style::default()
+        (border::PLAIN, Style::default())
     };
-
-    let lines = vec![
-        Line::from(Span::styled("Task Definition", Style::default().add_modifier(Modifier::BOLD))),
-        Line::from(""),
-        Line::from(vec![
-            Span::raw("Name: "),
-            Span::styled(
-                if app.draft.field == DraftField::Name {
-                    app.input.clone()
-                } else {
-                    app.draft.name.clone()
-                },
-                name_style,
-            ),
-        ]),
-        Line::from(vec![
-            Span::raw("Dataset folder: "),
-            Span::styled(
-                if app.draft.field == DraftField::DatasetFolder {
-                    app.input.clone()
-                } else {
-                    app.draft.dataset_folder.clone()
-                },
-                dataset_style,
-            ),
-        ]),
-        Line::from(""),
-        Line::from("Heuristics (mock):"),
-        Line::from(" - edge_threshold: 0.42"),
-        Line::from(" - min_blob_area: 120"),
-        Line::from(" - contrast_boost: 1.25"),
-    ];
-
     let block = Block::default()
         .borders(Borders::ALL)
-        .title("Task Input [Tab to switch]");
-    frame.render_widget(Paragraph::new(Text::from(lines)).block(block), area);
+        .border_set(border_set)
+        .border_style(border_style)
+        .title(Span::styled("Task Description [F1]", title_style));
+    frame.render_widget(block.clone(), area);
+
+    let inner = block.inner(area);
+    let columns = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage(32),
+            Constraint::Percentage(32),
+            Constraint::Percentage(36),
+        ])
+        .split(inner);
+
+    let name_cursor = draw_name_box(frame, columns[0], app);
+    let dataset_cursor = draw_dataset_box(frame, columns[1], app);
+    let heuristics_cursor = draw_heuristics_box(frame, columns[2], app);
+    name_cursor.or(dataset_cursor).or(heuristics_cursor)
 }
 
-fn draw_hypothesis_panel(frame: &mut Frame, area: Rect, app: &AppState) {
-    let chunks = Layout::default()
+fn draw_name_box(frame: &mut Frame, area: Rect, app: &AppState) -> Option<(u16, u16)> {
+    let active = app.fragment == Fragment::TaskDescription && app.draft.field == DraftField::Name;
+    let title_style = if active {
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let value = if app.draft.field == DraftField::Name {
+        app.input.clone()
+    } else {
+        app.draft.name.clone()
+    };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(Span::styled("Name", title_style));
+    frame.render_widget(Paragraph::new(value).block(block), area);
+    if active {
+        let x = area.x + 1 + app.cursor_pos.min(area.width.saturating_sub(2) as usize) as u16;
+        let y = area.y + 1;
+        return Some((x, y));
+    }
+    None
+}
+
+fn draw_dataset_box(frame: &mut Frame, area: Rect, app: &AppState) -> Option<(u16, u16)> {
+    let active =
+        app.fragment == Fragment::TaskDescription && app.draft.field == DraftField::DatasetFolder;
+    let title_style = if active {
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let value = if app.draft.field == DraftField::DatasetFolder {
+        app.input.clone()
+    } else {
+        app.draft.dataset_folder.clone()
+    };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(Span::styled("Dataset Folder", title_style));
+    frame.render_widget(Paragraph::new(value).block(block), area);
+    if active {
+        let x = area.x + 1 + app.cursor_pos.min(area.width.saturating_sub(2) as usize) as u16;
+        let y = area.y + 1;
+        return Some((x, y));
+    }
+    None
+}
+
+fn draw_heuristics_box(frame: &mut Frame, area: Rect, app: &AppState) -> Option<(u16, u16)> {
+    let active =
+        app.fragment == Fragment::TaskDescription && app.draft.field == DraftField::Heuristics;
+    let title_style = if active {
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(Span::styled("Heuristics [+ to add]", title_style));
+    frame.render_widget(block.clone(), area);
+
+    let inner = block.inner(area);
+    let columns = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(area);
+        .split(inner);
 
+    let title_cursor = draw_heuristic_titles(frame, columns[0], app);
+    let image_cursor = draw_heuristic_images(frame, columns[1], app);
+    title_cursor.or(image_cursor)
+}
+
+fn draw_heuristic_titles(frame: &mut Frame, area: Rect, app: &AppState) -> Option<(u16, u16)> {
+    let active = app.fragment == Fragment::TaskDescription
+        && app.draft.field == DraftField::Heuristics
+        && app.draft.heuristics_focus == HeuristicsFocus::Titles;
+    let title_style = if active {
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let mut items = Vec::new();
+    if app.draft.heuristics.is_empty() {
+        items.push(ListItem::new(Span::styled(
+            "[Empty List]",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, heuristic) in app.draft.heuristics.iter().enumerate() {
+            let selected = idx == app.draft.selected_heuristic;
+            let style = if active && selected {
+                selected_list_style()
+            } else {
+                Style::default()
+            };
+            items.push(ListItem::new(Span::styled(
+                truncate(&heuristic.title, 24),
+                style,
+            )));
+        }
+    }
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(Span::styled("Titles", title_style));
+    frame.render_widget(List::new(items).block(block), area);
+    if active && !app.draft.heuristics.is_empty() {
+        let x = area.x + 1 + app.cursor_pos.min(area.width.saturating_sub(2) as usize) as u16;
+        let y = area.y + 1 + app.draft.selected_heuristic as u16;
+        return Some((x, y));
+    }
+    None
+}
+
+fn draw_heuristic_images(frame: &mut Frame, area: Rect, app: &AppState) -> Option<(u16, u16)> {
+    let active = app.fragment == Fragment::TaskDescription
+        && app.draft.field == DraftField::Heuristics
+        && app.draft.heuristics_focus == HeuristicsFocus::Images;
+    let title_style = if active {
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let images = app
+        .draft
+        .heuristics
+        .get(app.draft.selected_heuristic)
+        .map(|h| h.images.as_slice())
+        .unwrap_or(&[]);
+    let mut items = Vec::new();
+    if images.is_empty() {
+        items.push(ListItem::new(Span::styled(
+            "[Empty List]",
+            Style::default().fg(Color::DarkGray),
+        )));
+    } else {
+        for (idx, image) in images.iter().enumerate() {
+            let selected = idx == app.draft.selected_image;
+            let style = if active && selected {
+                selected_list_style()
+            } else {
+                Style::default()
+            };
+            items.push(ListItem::new(Span::styled(
+                truncate(image, 24),
+                style,
+            )));
+        }
+    }
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .title(Span::styled("Images (Right arrow)", title_style));
+    frame.render_widget(List::new(items).block(block), area);
+    if active && !images.is_empty() {
+        let x = area.x + 1 + app.cursor_pos.min(area.width.saturating_sub(2) as usize) as u16;
+        let y = area.y + 1 + app.draft.selected_image as u16;
+        return Some((x, y));
+    }
+    None
+}
+
+fn draw_hypothesis_fragment(frame: &mut Frame, area: Rect, app: &AppState) {
+    let active = app.fragment == Fragment::TaskHypotheses;
+    let title_style = if active {
+        Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default()
+    };
+    let (border_set, border_style) = if active {
+        (dashed_border_set(), Style::default().fg(Color::Green))
+    } else {
+        (border::PLAIN, Style::default())
+    };
     let hypothesis_items = app
         .draft
         .hypotheses
@@ -334,64 +508,40 @@ fn draw_hypothesis_panel(frame: &mut Frame, area: Rect, app: &AppState) {
         .enumerate()
         .map(|(idx, h)| {
             let selected = idx == app.draft.selected_hypothesis;
-            let style = if app.draft.focus == DraftFocus::Hypotheses && selected {
-                Style::default().fg(Color::Green).add_modifier(Modifier::REVERSED)
+            let style = if active && selected {
+                selected_list_style()
             } else {
                 Style::default()
             };
-            ListItem::new(Span::styled(truncate(&h.title, 36), style))
+            ListItem::new(Span::styled(truncate(&h.title, 60), style))
         })
         .collect::<Vec<_>>();
 
     let hypothesis_list = List::new(hypothesis_items).block(
         Block::default()
             .borders(Borders::ALL)
-            .title("Hypotheses [H]"),
+            .border_set(border_set)
+            .border_style(border_style)
+            .title(Span::styled("Hypotheses [F2]", title_style)),
     );
 
-    frame.render_widget(hypothesis_list, chunks[0]);
-
-    let images = app
-        .draft
-        .hypotheses
-        .get(app.draft.selected_hypothesis)
-        .map(|h| h.images.as_slice())
-        .unwrap_or(&[]);
-
-    let image_items = if images.is_empty() {
-        vec![ListItem::new("none")]
-    } else {
-        images
-            .iter()
-            .enumerate()
-            .map(|(idx, img)| {
-                let selected = idx == app.draft.selected_image;
-                let style = if app.draft.focus == DraftFocus::Images && selected {
-                    Style::default().fg(Color::Green).add_modifier(Modifier::REVERSED)
-                } else {
-                    Style::default()
-                };
-                ListItem::new(Span::styled(img.clone(), style))
-            })
-            .collect()
-    };
-
-    let image_list = List::new(image_items).block(
-        Block::default()
-            .borders(Borders::ALL)
-            .title("Images [I]"),
-    );
-    frame.render_widget(image_list, chunks[1]);
+    frame.render_widget(hypothesis_list, area);
 }
 
 fn draw_task_input_help(frame: &mut Frame, area: Rect, _app: &AppState) {
     let help = Line::from(vec![
+        Span::styled("F1/F2", Style::default().fg(Color::Yellow)),
+        Span::raw(" switch fragment  "),
         Span::styled("Tab", Style::default().fg(Color::Yellow)),
         Span::raw(" switch field  "),
+        Span::styled("+", Style::default().fg(Color::Yellow)),
+        Span::raw(" add heuristic  "),
+        Span::styled("Right/Left", Style::default().fg(Color::Yellow)),
+        Span::raw(" images/titles  "),
         Span::styled("Up/Down", Style::default().fg(Color::Yellow)),
         Span::raw(" move lists  "),
         Span::styled("Enter", Style::default().fg(Color::Yellow)),
-        Span::raw(" submit  "),
+        Span::raw(" add image (images) / submit (form)  "),
         Span::styled("Esc", Style::default().fg(Color::Yellow)),
         Span::raw(" cancel"),
     ]);
@@ -448,6 +598,13 @@ fn truncate(value: &str, max: usize) -> String {
     let mut out = value.chars().take(max - 3).collect::<String>();
     out.push_str("...");
     out
+}
+
+fn selected_list_style() -> Style {
+    Style::default()
+        .bg(Color::Green)
+        .fg(Color::Black)
+        .add_modifier(Modifier::BOLD)
 }
 
 fn dashed_border_set() -> border::Set {
