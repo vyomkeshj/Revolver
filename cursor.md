@@ -22,7 +22,7 @@
 
 ### Event-Driven Core (Serializable)
 
-- All interactions are expressed as **`AppEvent`**:
+- All interactions are expressed as **`AppEvent`** with screen-specific payloads:
   - Enqueued by screens/fragments on keypress.
   - Drained by the main loop via `AppState::apply_event`.
   - Designed to be serializable for future replay and remote event sources.

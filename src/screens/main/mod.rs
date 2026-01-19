@@ -4,8 +4,8 @@ use crossterm::event::KeyCode;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::Frame;
 
-use crate::app::{AppEvent, AppState};
-use crate::screens::{FragmentId, KeyBinding, Screen};
+use crate::app::{AppEvent, AppState, MainScreenEvent};
+use crate::screens::{KeyBinding, Screen};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Action {
@@ -94,13 +94,15 @@ fn handle_action(
 ) -> std::io::Result<bool> {
     match action {
         Action::Quit => app.enqueue_event(AppEvent::Quit),
-        Action::OpenTaskInput => app.enqueue_event(AppEvent::OpenTaskInput),
-        Action::FocusTasks => app.enqueue_event(AppEvent::SwitchFragment(FragmentId::MainTasks)),
-        Action::FocusDetail => app.enqueue_event(AppEvent::SwitchFragment(FragmentId::MainDetail)),
-        Action::FocusInput => app.enqueue_event(AppEvent::SwitchFragment(FragmentId::MainInput)),
-        Action::NextTask => app.enqueue_event(AppEvent::SelectTaskNext),
-        Action::PrevTask => app.enqueue_event(AppEvent::SelectTaskPrev),
-        Action::CancelTask => app.enqueue_event(AppEvent::CancelSelectedTask),
+        Action::OpenTaskInput => app.enqueue_event(AppEvent::Main(MainScreenEvent::OpenTaskInput)),
+        Action::FocusTasks => app.enqueue_event(AppEvent::Main(MainScreenEvent::FocusTasks)),
+        Action::FocusDetail => app.enqueue_event(AppEvent::Main(MainScreenEvent::FocusDetail)),
+        Action::FocusInput => app.enqueue_event(AppEvent::Main(MainScreenEvent::FocusInput)),
+        Action::NextTask => app.enqueue_event(AppEvent::Main(MainScreenEvent::SelectTaskNext)),
+        Action::PrevTask => app.enqueue_event(AppEvent::Main(MainScreenEvent::SelectTaskPrev)),
+        Action::CancelTask => {
+            app.enqueue_event(AppEvent::Main(MainScreenEvent::CancelSelectedTask))
+        }
     }
     Ok(false)
 }

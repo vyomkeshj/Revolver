@@ -24,25 +24,36 @@ pub enum HeuristicsFocus {
 pub enum AppEvent {
     Quit,
     ToggleCursor,
-    SwitchScreen(ScreenId),
-    SwitchFragment(FragmentId),
+    Main(MainScreenEvent),
+    TaskInput(TaskInputEvent),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MainScreenEvent {
     OpenTaskInput,
-    CloseTaskInput,
+    FocusTasks,
+    FocusDetail,
+    FocusInput,
     SelectTaskNext,
     SelectTaskPrev,
     CancelSelectedTask,
-    DraftSwitchField,
-    DraftFocusDescription,
-    DraftFocusHypotheses,
-    DraftCursorLeft,
-    DraftCursorRight,
-    DraftMoveUp,
-    DraftMoveDown,
-    DraftAddHeuristic,
-    DraftAddImage,
-    DraftBackspace,
-    DraftInsertChar(char),
-    DraftSubmit,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TaskInputEvent {
+    Close,
+    SwitchField,
+    FocusDescription,
+    FocusHypotheses,
+    CursorLeft,
+    CursorRight,
+    MoveUp,
+    MoveDown,
+    AddHeuristic,
+    AddImage,
+    Backspace,
+    InsertChar(char),
+    Submit,
 }
 
 #[derive(Debug, Default)]
@@ -278,26 +289,40 @@ impl AppState {
         match event {
             AppEvent::Quit => result.quit = true,
             AppEvent::ToggleCursor => self.toggle_cursor(),
-            AppEvent::SwitchScreen(screen) => self.screen = screen,
-            AppEvent::SwitchFragment(fragment) => self.fragment = fragment,
-            AppEvent::OpenTaskInput => self.open_task_input(),
-            AppEvent::CloseTaskInput => self.close_task_input(),
-            AppEvent::SelectTaskNext => {
+            AppEvent::Main(main) => self.apply_main_event(main, &mut result),
+            AppEvent::TaskInput(task_input) => self.apply_task_input_event(task_input, &mut result),
+        }
+        result
+    }
+
+    fn apply_main_event(&mut self, event: MainScreenEvent, result: &mut EventResult) {
+        match event {
+            MainScreenEvent::OpenTaskInput => self.open_task_input(),
+            MainScreenEvent::FocusTasks => self.set_fragment(FragmentId::MainTasks),
+            MainScreenEvent::FocusDetail => self.set_fragment(FragmentId::MainDetail),
+            MainScreenEvent::FocusInput => self.set_fragment(FragmentId::MainInput),
+            MainScreenEvent::SelectTaskNext => {
                 if self.fragment == FragmentId::MainTasks {
                     self.select_next();
                 }
             }
-            AppEvent::SelectTaskPrev => {
+            MainScreenEvent::SelectTaskPrev => {
                 if self.fragment == FragmentId::MainTasks {
                     self.select_prev();
                 }
             }
-            AppEvent::CancelSelectedTask => {
+            MainScreenEvent::CancelSelectedTask => {
                 if let Some(task) = self.selected_task() {
                     result.cmd = Some(UiToEngine::CancelTask { id: task.id });
                 }
             }
-            AppEvent::DraftSwitchField => {
+        }
+    }
+
+    fn apply_task_input_event(&mut self, event: TaskInputEvent, result: &mut EventResult) {
+        match event {
+            TaskInputEvent::Close => self.close_task_input(),
+            TaskInputEvent::SwitchField => {
                 if self.fragment == FragmentId::TaskDescription {
                     self.commit_draft_field();
                     self.draft.field = match self.draft.field {
@@ -308,13 +333,13 @@ impl AppState {
                     self.load_draft_field();
                 }
             }
-            AppEvent::DraftFocusDescription => self.set_fragment(FragmentId::TaskDescription),
-            AppEvent::DraftFocusHypotheses => self.set_fragment(FragmentId::TaskHypotheses),
-            AppEvent::DraftCursorLeft => self.move_cursor_left(),
-            AppEvent::DraftCursorRight => self.move_cursor_right(),
-            AppEvent::DraftMoveUp => self.move_selection_up(),
-            AppEvent::DraftMoveDown => self.move_selection_down(),
-            AppEvent::DraftAddHeuristic => {
+            TaskInputEvent::FocusDescription => self.set_fragment(FragmentId::TaskDescription),
+            TaskInputEvent::FocusHypotheses => self.set_fragment(FragmentId::TaskHypotheses),
+            TaskInputEvent::CursorLeft => self.move_cursor_left(),
+            TaskInputEvent::CursorRight => self.move_cursor_right(),
+            TaskInputEvent::MoveUp => self.move_selection_up(),
+            TaskInputEvent::MoveDown => self.move_selection_down(),
+            TaskInputEvent::AddHeuristic => {
                 if self.fragment == FragmentId::TaskDescription
                     && self.draft.field == DraftField::Heuristics
                 {
@@ -326,16 +351,16 @@ impl AppState {
                     }
                 }
             }
-            AppEvent::DraftAddImage => self.add_image(),
-            AppEvent::DraftBackspace => self.handle_backspace(),
-            AppEvent::DraftInsertChar(ch) => self.handle_insert_char(ch),
-            AppEvent::DraftSubmit => {
+            TaskInputEvent::AddImage => self.add_image(),
+            TaskInputEvent::Backspace => self.handle_backspace(),
+            TaskInputEvent::InsertChar(ch) => self.handle_insert_char(ch),
+            TaskInputEvent::Submit => {
                 if self.fragment == FragmentId::TaskDescription
                     && self.draft.field == DraftField::Heuristics
                     && self.draft.heuristics_focus == HeuristicsFocus::Images
                 {
                     self.add_image();
-                    return result;
+                    return;
                 }
                 self.commit_draft_field();
                 let name = self.draft.name.trim().to_string();
@@ -346,7 +371,6 @@ impl AppState {
                 self.close_task_input();
             }
         }
-        result
     }
 
     fn move_cursor_left(&mut self) {

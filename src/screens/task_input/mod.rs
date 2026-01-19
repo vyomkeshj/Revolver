@@ -4,7 +4,7 @@ use crossterm::event::KeyCode;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::Frame;
 
-use crate::app::AppState;
+use crate::app::{AppState, TaskInputEvent};
 use crate::screens::{KeyBinding, Screen};
 
 #[derive(Debug, Clone, Copy)]
@@ -93,7 +93,7 @@ pub fn handle_key(
         return handle_action(binding.action, app);
     }
     if let KeyCode::Char(ch) = key {
-        app.enqueue_event(crate::app::AppEvent::DraftInsertChar(ch));
+        app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::InsertChar(ch)));
         return Ok(false);
     }
     Ok(false)
@@ -104,17 +104,17 @@ fn handle_action(
     app: &mut AppState,
 ) -> std::io::Result<bool> {
     match action {
-        Action::Close => app.enqueue_event(crate::app::AppEvent::CloseTaskInput),
-        Action::SwitchField => app.enqueue_event(crate::app::AppEvent::DraftSwitchField),
-        Action::FocusDescription => app.enqueue_event(crate::app::AppEvent::DraftFocusDescription),
-        Action::FocusHypotheses => app.enqueue_event(crate::app::AppEvent::DraftFocusHypotheses),
-        Action::CursorLeft => app.enqueue_event(crate::app::AppEvent::DraftCursorLeft),
-        Action::CursorRight => app.enqueue_event(crate::app::AppEvent::DraftCursorRight),
-        Action::MoveUp => app.enqueue_event(crate::app::AppEvent::DraftMoveUp),
-        Action::MoveDown => app.enqueue_event(crate::app::AppEvent::DraftMoveDown),
-        Action::AddHeuristic => app.enqueue_event(crate::app::AppEvent::DraftAddHeuristic),
-        Action::Submit => app.enqueue_event(crate::app::AppEvent::DraftSubmit),
-        Action::Backspace => app.enqueue_event(crate::app::AppEvent::DraftBackspace),
+        Action::Close => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Close)),
+        Action::SwitchField => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::SwitchField)),
+        Action::FocusDescription => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::FocusDescription)),
+        Action::FocusHypotheses => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::FocusHypotheses)),
+        Action::CursorLeft => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::CursorLeft)),
+        Action::CursorRight => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::CursorRight)),
+        Action::MoveUp => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::MoveUp)),
+        Action::MoveDown => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::MoveDown)),
+        Action::AddHeuristic => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::AddHeuristic)),
+        Action::Submit => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Submit)),
+        Action::Backspace => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Backspace)),
     }
     Ok(false)
 }
