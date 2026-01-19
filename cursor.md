@@ -1,19 +1,65 @@
 ## Revolver TUI Architecture
 
-- **Runtime**: async `tokio` loop driving TUI render + scheduler updates.
-- **UI**: `ratatui` + `crossterm` with a header, task list, task detail, input, and controls.
-- **Navigation model**: `ScreenId` + `FragmentId`, `Screen` trait, and event queue in `AppState`.
-- **Events**: screen handlers enqueue `AppEvent`s; main loop drains and applies.
-- **Scheduler**: background task runner with cancel support via `watch` channels.
-- **LLM**: `RigLlm` mock by default; real LLM behind `real-llm` feature flag.
-- **Reports**: markdown generated per task in `reports/`.
+### High-Level Flow
+
+- The app runs a single async render loop (`tokio`) that:
+  - draws the current screen,
+  - reads keyboard input,
+  - enqueues `AppEvent`s,
+  - drains the event queue to mutate `AppState`,
+  - emits `SchedulerCommand`s for background work.
+
+### Screens & Fragments
+
+- **Screens** are top-level views (see `ScreenId`), each implemented as a `Screen` trait with:
+  - `draw(...)` for rendering,
+  - `handle_key(...)` for mapping key presses to `AppEvent`s.
+- **Fragments** are sub-sections within a screen (see `FragmentId`), used to:
+  - scope focus and list selection,
+  - drive conditional input behavior,
+  - control which actions are valid at a time.
+- Fragments do not call each other directly; they read shared state and respond to events.
+
+### Event-Driven Core (Serializable)
+
+- All interactions are expressed as **`AppEvent`**:
+  - Enqueued by screens/fragments on keypress.
+  - Drained by the main loop via `AppState::apply_event`.
+  - Designed to be serializable for future replay and remote event sources.
+- `apply_event` returns `EventResult`:
+  - `quit` flag for shutdown,
+  - optional `SchedulerCommand` to send to the background worker.
+
+### Data Ownership & Sharing
+
+- **`AppState` is the single source of truth** for UI state:
+  - current screen/fragment,
+  - selection indices,
+  - in-progress task draft,
+  - cursor position + blink state,
+  - task list snapshots and logs.
+- Screens/fragments only mutate via `AppEvent`s, so state changes are replayable.
+
+### Scheduler Boundary
+
+- Background processing is isolated behind `SchedulerCommand` and `TaskUpdate`:
+  - UI emits `SchedulerCommand` (e.g., add/cancel task).
+  - Scheduler sends `TaskUpdate` to keep UI state in sync.
+  - This boundary is designed to be swapped with a remote event server.
+
+### Future Server Decoupling
+
+- The design assumes a future external event server:
+  - UI will consume serialized events (replayable).
+  - Scheduler can move out-of-process and stream `TaskUpdate` back.
+  - The UI remains event-driven with minimal changes.
 
 ## Key Files
 
 - `src/main.rs`: terminal setup, splash, event loop, key handling.
 - `src/screens/`: screen modules and fragment folders with key bindings.
 - `src/ui.rs`: shared UI helpers (splash, borders, formatting).
-- `src/app.rs`: app state, selection, focus.
+- `src/app.rs`: `AppState`, `AppEvent`, event queue, state mutations.
 - `src/scheduler.rs`: task lifecycle, evaluation loop, logging.
 - `src/task.rs`: domain models for tasks/hypotheses.
 - `src/llm.rs`: LLM interface (mock + optional Rig).
