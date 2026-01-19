@@ -4,7 +4,7 @@ use crossterm::event::KeyCode;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::Frame;
 
-use crate::app::{AppState, TaskInputEvent};
+use crate::app::{AppState, TaskInputEvent, TextEditEvent};
 use crate::screens::{KeyBinding, Screen};
 
 #[derive(Debug, Clone, Copy)]
@@ -93,7 +93,9 @@ pub fn handle_key(
         return handle_action(binding.action, app);
     }
     if let KeyCode::Char(ch) = key {
-        app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::InsertChar(ch)));
+        app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Edit(
+            TextEditEvent::InsertChar(ch),
+        )));
         return Ok(false);
     }
     Ok(false)
@@ -108,13 +110,13 @@ fn handle_action(
         Action::SwitchField => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::SwitchField)),
         Action::FocusDescription => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::FocusDescription)),
         Action::FocusHypotheses => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::FocusHypotheses)),
-        Action::CursorLeft => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::CursorLeft)),
-        Action::CursorRight => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::CursorRight)),
-        Action::MoveUp => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::MoveUp)),
-        Action::MoveDown => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::MoveDown)),
+        Action::CursorLeft => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::CursorLeft))),
+        Action::CursorRight => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::CursorRight))),
+        Action::MoveUp => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::MoveUp))),
+        Action::MoveDown => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::MoveDown))),
         Action::AddHeuristic => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::AddHeuristic)),
         Action::Submit => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Submit)),
-        Action::Backspace => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Backspace)),
+        Action::Backspace => app.enqueue_event(crate::app::AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::Backspace))),
     }
     Ok(false)
 }

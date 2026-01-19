@@ -26,6 +26,7 @@
   - Enqueued by screens/fragments on keypress.
   - Drained by the main loop via `AppState::apply_event`.
   - Designed to be serializable for future replay and remote event sources.
+- **Text editing** reuses `TextEditEvent` for cursor movement, typing, and deletion.
 -- `apply_event` returns `EventResult`:
   - `quit` flag for shutdown,
   - optional `UiToEngine` command for the engine.

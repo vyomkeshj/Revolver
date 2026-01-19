@@ -3,7 +3,7 @@ use std::env;
 use dotenvy::dotenv;
 use rig::{client::{CompletionClient, ProviderClient}, completion::Prompt, providers::openai};
 
-use revolver::app::{AppEvent, AppState, MainScreenEvent, TaskInputEvent};
+use revolver::app::{AppEvent, AppState, MainScreenEvent, TaskInputEvent, TextEditEvent};
 
 #[tokio::test]
 async fn rig_llm_generation_uses_env_key() {
@@ -32,15 +32,15 @@ fn replay_app_events_reaches_expected_state() {
     let original_dataset = app.draft.dataset_folder.clone();
     let events = vec![
         AppEvent::Main(MainScreenEvent::OpenTaskInput),
-        AppEvent::TaskInput(TaskInputEvent::InsertChar('t')),
-        AppEvent::TaskInput(TaskInputEvent::InsertChar('a')),
-        AppEvent::TaskInput(TaskInputEvent::InsertChar('s')),
-        AppEvent::TaskInput(TaskInputEvent::InsertChar('k')),
-        AppEvent::TaskInput(TaskInputEvent::InsertChar('1')),
+        AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::InsertChar('t'))),
+        AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::InsertChar('a'))),
+        AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::InsertChar('s'))),
+        AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::InsertChar('k'))),
+        AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::InsertChar('1'))),
         AppEvent::TaskInput(TaskInputEvent::SwitchField),
-        AppEvent::TaskInput(TaskInputEvent::InsertChar('/')),
-        AppEvent::TaskInput(TaskInputEvent::InsertChar('d')),
-        AppEvent::TaskInput(TaskInputEvent::InsertChar('s')),
+        AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::InsertChar('/'))),
+        AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::InsertChar('d'))),
+        AppEvent::TaskInput(TaskInputEvent::Edit(TextEditEvent::InsertChar('s'))),
     ];
 
     for event in events {

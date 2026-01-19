@@ -40,19 +40,24 @@ pub enum MainScreenEvent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TextEditEvent {
+    CursorLeft,
+    CursorRight,
+    MoveUp,
+    MoveDown,
+    Backspace,
+    InsertChar(char),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum TaskInputEvent {
     Close,
     SwitchField,
     FocusDescription,
     FocusHypotheses,
-    CursorLeft,
-    CursorRight,
-    MoveUp,
-    MoveDown,
     AddHeuristic,
     AddImage,
-    Backspace,
-    InsertChar(char),
+    Edit(TextEditEvent),
     Submit,
 }
 
@@ -335,10 +340,6 @@ impl AppState {
             }
             TaskInputEvent::FocusDescription => self.set_fragment(FragmentId::TaskDescription),
             TaskInputEvent::FocusHypotheses => self.set_fragment(FragmentId::TaskHypotheses),
-            TaskInputEvent::CursorLeft => self.move_cursor_left(),
-            TaskInputEvent::CursorRight => self.move_cursor_right(),
-            TaskInputEvent::MoveUp => self.move_selection_up(),
-            TaskInputEvent::MoveDown => self.move_selection_down(),
             TaskInputEvent::AddHeuristic => {
                 if self.fragment == FragmentId::TaskDescription
                     && self.draft.field == DraftField::Heuristics
@@ -352,8 +353,7 @@ impl AppState {
                 }
             }
             TaskInputEvent::AddImage => self.add_image(),
-            TaskInputEvent::Backspace => self.handle_backspace(),
-            TaskInputEvent::InsertChar(ch) => self.handle_insert_char(ch),
+            TaskInputEvent::Edit(edit) => self.apply_text_edit_event(edit),
             TaskInputEvent::Submit => {
                 if self.fragment == FragmentId::TaskDescription
                     && self.draft.field == DraftField::Heuristics
@@ -370,6 +370,17 @@ impl AppState {
                 self.reset_draft();
                 self.close_task_input();
             }
+        }
+    }
+
+    fn apply_text_edit_event(&mut self, event: TextEditEvent) {
+        match event {
+            TextEditEvent::CursorLeft => self.move_cursor_left(),
+            TextEditEvent::CursorRight => self.move_cursor_right(),
+            TextEditEvent::MoveUp => self.move_selection_up(),
+            TextEditEvent::MoveDown => self.move_selection_down(),
+            TextEditEvent::Backspace => self.handle_backspace(),
+            TextEditEvent::InsertChar(ch) => self.handle_insert_char(ch),
         }
     }
 
