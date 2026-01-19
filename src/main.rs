@@ -20,6 +20,7 @@ use tokio::time::{interval, sleep};
 use crate::app::AppState;
 use crate::scheduler::{run_scheduler, SchedulerCommand};
 use crate::screens::dispatch_key;
+use crate::app::AppEvent;
 
 #[tokio::main]
 async fn main() -> io::Result<()> {
@@ -48,12 +49,22 @@ async fn main() -> io::Result<()> {
                     restore_terminal(&mut terminal)?;
                     return Ok(());
                 }
+                if process_events(&mut app, &cmd_tx).await? {
+                    let _ = cmd_tx.send(SchedulerCommand::Shutdown).await;
+                    restore_terminal(&mut terminal)?;
+                    return Ok(());
+                }
             }
         }
 
         tokio::select! {
             _ = tick.tick() => {
-                app.toggle_cursor();
+                app.enqueue_event(AppEvent::ToggleCursor);
+                if process_events(&mut app, &cmd_tx).await? {
+                    let _ = cmd_tx.send(SchedulerCommand::Shutdown).await;
+                    restore_terminal(&mut terminal)?;
+                    return Ok(());
+                }
             }
             Some(update) = ui_rx.recv() => {
                 app.apply_update(update);
@@ -68,6 +79,22 @@ fn setup_terminal() -> io::Result<Terminal<CrosstermBackend<Stdout>>> {
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     Terminal::new(backend)
+}
+
+async fn process_events(
+    app: &mut AppState,
+    cmd_tx: &mpsc::Sender<SchedulerCommand>,
+) -> io::Result<bool> {
+    while let Some(event) = app.pop_event() {
+        let outcome = app.apply_event(event);
+        if let Some(cmd) = outcome.cmd {
+            let _ = cmd_tx.send(cmd).await;
+        }
+        if outcome.quit {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> io::Result<()> {

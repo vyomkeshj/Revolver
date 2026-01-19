@@ -2,7 +2,8 @@
 
 - **Runtime**: async `tokio` loop driving TUI render + scheduler updates.
 - **UI**: `ratatui` + `crossterm` with a header, task list, task detail, input, and controls.
-- **Navigation model**: `ScreenId` + `FragmentId`, with `Screen` trait and per-screen keymaps.
+- **Navigation model**: `ScreenId` + `FragmentId`, `Screen` trait, and event queue in `AppState`.
+- **Events**: screen handlers enqueue `AppEvent`s; main loop drains and applies.
 - **Scheduler**: background task runner with cancel support via `watch` channels.
 - **LLM**: `RigLlm` mock by default; real LLM behind `real-llm` feature flag.
 - **Reports**: markdown generated per task in `reports/`.

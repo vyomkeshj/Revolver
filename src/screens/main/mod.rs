@@ -5,7 +5,7 @@ use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::Frame;
 use tokio::sync::mpsc;
 
-use crate::app::AppState;
+use crate::app::{AppEvent, AppState};
 use crate::scheduler::SchedulerCommand;
 use crate::screens::{FragmentId, KeyBinding, Screen};
 
@@ -97,27 +97,16 @@ fn handle_action(
     app: &mut AppState,
     cmd_tx: &mpsc::Sender<SchedulerCommand>,
 ) -> std::io::Result<bool> {
+    let _ = cmd_tx;
     match action {
-        Action::Quit => return Ok(true),
-        Action::OpenTaskInput => app.open_task_input(),
-        Action::FocusTasks => app.set_fragment(FragmentId::MainTasks),
-        Action::FocusDetail => app.set_fragment(FragmentId::MainDetail),
-        Action::FocusInput => app.set_fragment(FragmentId::MainInput),
-        Action::NextTask => {
-            if app.fragment == FragmentId::MainTasks {
-                app.select_next();
-            }
-        }
-        Action::PrevTask => {
-            if app.fragment == FragmentId::MainTasks {
-                app.select_prev();
-            }
-        }
-        Action::CancelTask => {
-            if let Some(task) = app.selected_task() {
-                let _ = cmd_tx.try_send(SchedulerCommand::CancelTask { id: task.id });
-            }
-        }
+        Action::Quit => app.enqueue_event(AppEvent::Quit),
+        Action::OpenTaskInput => app.enqueue_event(AppEvent::OpenTaskInput),
+        Action::FocusTasks => app.enqueue_event(AppEvent::SwitchFragment(FragmentId::MainTasks)),
+        Action::FocusDetail => app.enqueue_event(AppEvent::SwitchFragment(FragmentId::MainDetail)),
+        Action::FocusInput => app.enqueue_event(AppEvent::SwitchFragment(FragmentId::MainInput)),
+        Action::NextTask => app.enqueue_event(AppEvent::SelectTaskNext),
+        Action::PrevTask => app.enqueue_event(AppEvent::SelectTaskPrev),
+        Action::CancelTask => app.enqueue_event(AppEvent::CancelSelectedTask),
     }
     Ok(false)
 }
