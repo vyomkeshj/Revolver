@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::scheduler::TaskUpdate;
+use crate::engine::scheduler::TaskUpdate;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum UiToEngine {

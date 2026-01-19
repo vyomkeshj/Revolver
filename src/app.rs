@@ -3,7 +3,7 @@ use std::collections::{HashMap, VecDeque};
 use serde::{Deserialize, Serialize};
 
 use crate::protocol::UiToEngine;
-use crate::scheduler::TaskUpdate;
+use crate::engine::scheduler::TaskUpdate;
 use crate::task::TaskSnapshot;
 use crate::screens::{FragmentId, ScreenId};
 

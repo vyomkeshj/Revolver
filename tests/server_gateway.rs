@@ -2,8 +2,8 @@ use tokio::sync::mpsc;
 use tokio::time::{timeout, Duration};
 
 use revolver::gateway::Gateway;
+use revolver::engine::scheduler::run_scheduler;
 use revolver::protocol::{EngineToUi, UiToEngine};
-use revolver::scheduler::run_scheduler;
 
 #[tokio::test]
 async fn scheduler_emits_updates_via_gateway() {
@@ -25,7 +25,7 @@ async fn scheduler_emits_updates_via_gateway() {
         .expect("engine channel closed");
 
     assert!(
-        matches!(msg, EngineToUi::TaskUpdate(revolver::scheduler::TaskUpdate::Upsert(_))),
+        matches!(msg, EngineToUi::TaskUpdate(revolver::engine::scheduler::TaskUpdate::Upsert(_))),
         "expected an Upsert update"
     );
 
@@ -48,7 +48,7 @@ async fn cancel_task_sends_update() {
 
     let mut task_id = None;
     for _ in 0..5 {
-        if let Ok(Some(EngineToUi::TaskUpdate(revolver::scheduler::TaskUpdate::Upsert(
+        if let Ok(Some(EngineToUi::TaskUpdate(revolver::engine::scheduler::TaskUpdate::Upsert(
             snapshot,
         )))) = timeout(Duration::from_secs(2), gateway.recv()).await
         {
@@ -62,7 +62,7 @@ async fn cancel_task_sends_update() {
 
     let mut saw_cancel = false;
     for _ in 0..10 {
-        if let Ok(Some(EngineToUi::TaskUpdate(revolver::scheduler::TaskUpdate::Upsert(
+        if let Ok(Some(EngineToUi::TaskUpdate(revolver::engine::scheduler::TaskUpdate::Upsert(
             snapshot,
         )))) = timeout(Duration::from_secs(2), gateway.recv()).await
         {

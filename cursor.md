@@ -68,7 +68,7 @@
 - `src/ui.rs`: shared UI helpers (splash, borders, formatting).
 - `src/app.rs`: `AppState`, `AppEvent`, event queue, state mutations.
 - `src/lib.rs`: shared module exports for integration tests.
-- `src/scheduler.rs`: task lifecycle, evaluation loop, logging.
+- `src/engine/scheduler.rs`: task lifecycle, evaluation loop, logging.
 - `src/task.rs`: domain models for tasks/hypotheses.
 - `src/llm.rs`: LLM interface (mock + optional Rig).
 - `src/report.rs`: markdown report generation.

@@ -1,7 +1,7 @@
 mod app;
 mod llm;
 mod report;
-mod scheduler;
+mod engine;
 mod task;
 mod ui;
 mod screens;
@@ -22,7 +22,7 @@ use tokio::time::{interval, sleep};
 use crate::app::AppState;
 use crate::gateway::Gateway;
 use crate::protocol::{EngineToUi, UiToEngine};
-use crate::scheduler::run_scheduler;
+use crate::engine::scheduler::run_scheduler;
 use crate::screens::dispatch_key;
 use crate::app::AppEvent;
 
