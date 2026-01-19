@@ -6,27 +6,21 @@ use tokio::sync::{mpsc, watch};
 use tokio::time::sleep;
 
 use crate::llm::RigLlm;
+use crate::protocol::{EngineToUi, UiToEngine};
 use crate::report::generate_markdown_report;
 use crate::task::{
     Heuristics, Hypothesis, TaskDefinition, TaskPhase, TaskSnapshot, TaskStatus,
 };
 
-#[derive(Debug)]
-pub enum SchedulerCommand {
-    AddTask { name: String },
-    CancelTask { id: usize },
-    Shutdown,
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub enum TaskUpdate {
     Upsert(TaskSnapshot),
     Log { id: usize, message: String },
 }
 
 pub async fn run_scheduler(
-    mut cmd_rx: mpsc::Receiver<SchedulerCommand>,
-    ui_tx: mpsc::Sender<TaskUpdate>,
+    mut cmd_rx: mpsc::Receiver<UiToEngine>,
+    ui_tx: mpsc::Sender<EngineToUi>,
 ) {
     let mut next_id = 1usize;
     let mut cancels: HashMap<usize, watch::Sender<bool>> = HashMap::new();
@@ -34,7 +28,7 @@ pub async fn run_scheduler(
 
     while let Some(cmd) = cmd_rx.recv().await {
         match cmd {
-            SchedulerCommand::AddTask { name } => {
+            UiToEngine::AddTask { name } => {
                 let id = next_id;
                 next_id += 1;
                 let definition = TaskDefinition::mock(id, name);
@@ -46,12 +40,12 @@ pub async fn run_scheduler(
                     run_task(definition, cancel_rx, ui_tx_clone, llm_clone).await;
                 });
             }
-            SchedulerCommand::CancelTask { id } => {
+            UiToEngine::CancelTask { id } => {
                 if let Some(cancel) = cancels.get(&id) {
                     let _ = cancel.send(true);
                 }
             }
-            SchedulerCommand::Shutdown => break,
+            UiToEngine::Shutdown => break,
         }
     }
 }
@@ -59,7 +53,7 @@ pub async fn run_scheduler(
 async fn run_task(
     definition: TaskDefinition,
     cancel_rx: watch::Receiver<bool>,
-    ui_tx: mpsc::Sender<TaskUpdate>,
+    ui_tx: mpsc::Sender<EngineToUi>,
     llm: RigLlm,
 ) {
     let mut snapshot = TaskSnapshot::from_definition(&definition);
@@ -221,10 +215,12 @@ fn tail_hypotheses(all: &[Hypothesis], limit: usize) -> Vec<Hypothesis> {
     all[all.len() - limit..].to_vec()
 }
 
-async fn send_update(ui_tx: &mpsc::Sender<TaskUpdate>, snapshot: TaskSnapshot) {
-    let _ = ui_tx.send(TaskUpdate::Upsert(snapshot)).await;
+async fn send_update(ui_tx: &mpsc::Sender<EngineToUi>, snapshot: TaskSnapshot) {
+    let _ = ui_tx.send(EngineToUi::TaskUpdate(TaskUpdate::Upsert(snapshot))).await;
 }
 
-async fn send_log(ui_tx: &mpsc::Sender<TaskUpdate>, id: usize, message: String) {
-    let _ = ui_tx.send(TaskUpdate::Log { id, message }).await;
+async fn send_log(ui_tx: &mpsc::Sender<EngineToUi>, id: usize, message: String) {
+    let _ = ui_tx
+        .send(EngineToUi::TaskUpdate(TaskUpdate::Log { id, message }))
+        .await;
 }

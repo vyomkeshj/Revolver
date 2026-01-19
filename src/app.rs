@@ -2,7 +2,8 @@ use std::collections::{HashMap, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
-use crate::scheduler::{SchedulerCommand, TaskUpdate};
+use crate::protocol::UiToEngine;
+use crate::scheduler::TaskUpdate;
 use crate::task::TaskSnapshot;
 use crate::screens::{FragmentId, ScreenId};
 
@@ -47,7 +48,7 @@ pub enum AppEvent {
 #[derive(Debug, Default)]
 pub struct EventResult {
     pub quit: bool,
-    pub cmd: Option<SchedulerCommand>,
+    pub cmd: Option<UiToEngine>,
 }
 
 #[derive(Debug, Clone)]
@@ -293,7 +294,7 @@ impl AppState {
             }
             AppEvent::CancelSelectedTask => {
                 if let Some(task) = self.selected_task() {
-                    result.cmd = Some(SchedulerCommand::CancelTask { id: task.id });
+                    result.cmd = Some(UiToEngine::CancelTask { id: task.id });
                 }
             }
             AppEvent::DraftSwitchField => {
@@ -339,7 +340,7 @@ impl AppState {
                 self.commit_draft_field();
                 let name = self.draft.name.trim().to_string();
                 if !name.is_empty() {
-                    result.cmd = Some(SchedulerCommand::AddTask { name });
+                    result.cmd = Some(UiToEngine::AddTask { name });
                 }
                 self.reset_draft();
                 self.close_task_input();

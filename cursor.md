@@ -2,12 +2,12 @@
 
 ### High-Level Flow
 
-- The app runs a single async render loop (`tokio`) that:
+-- The app runs a single async render loop (`tokio`) that:
   - draws the current screen,
   - reads keyboard input,
   - enqueues `AppEvent`s,
   - drains the event queue to mutate `AppState`,
-  - emits `SchedulerCommand`s for background work.
+  - emits protocol messages to the engine via the `Gateway`.
 
 ### Screens & Fragments
 
@@ -26,9 +26,16 @@
   - Enqueued by screens/fragments on keypress.
   - Drained by the main loop via `AppState::apply_event`.
   - Designed to be serializable for future replay and remote event sources.
-- `apply_event` returns `EventResult`:
+-- `apply_event` returns `EventResult`:
   - `quit` flag for shutdown,
-  - optional `SchedulerCommand` to send to the background worker.
+  - optional `UiToEngine` command for the engine.
+
+### Protocol Boundary
+
+- **Protocol** uses serializable messages:
+  - `UiToEngine` for user intents,
+  - `EngineToUi` for task updates.
+- **Gateway** owns the channels and bridges UI ↔ engine.
 
 ### Data Ownership & Sharing
 

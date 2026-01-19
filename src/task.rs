@@ -1,12 +1,14 @@
 use std::time::SystemTime;
 
-#[derive(Clone, Debug)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImageItem {
     pub id: usize,
     pub name: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Heuristics {
     pub edge_threshold: f32,
     pub min_blob_area: usize,
@@ -23,14 +25,14 @@ pub struct TaskDefinition {
     pub created_at: SystemTime,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Hypothesis {
     pub id: usize,
     pub description: String,
     pub score: f32,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TaskStatus {
     Pending,
     Running,
@@ -39,7 +41,7 @@ pub enum TaskStatus {
     Failed(String),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TaskPhase {
     Defining,
     GeneratingHypotheses,
@@ -51,7 +53,7 @@ pub enum TaskPhase {
     Finished,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TaskSnapshot {
     pub id: usize,
     pub name: String,

@@ -3,10 +3,8 @@ pub mod fragments;
 use crossterm::event::KeyCode;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::Frame;
-use tokio::sync::mpsc;
 
 use crate::app::AppState;
-use crate::scheduler::SchedulerCommand;
 use crate::screens::{KeyBinding, Screen};
 
 #[derive(Debug, Clone, Copy)]
@@ -82,19 +80,17 @@ impl Screen for TaskInputScreen {
         &self,
         key: KeyCode,
         app: &mut AppState,
-        cmd_tx: &mpsc::Sender<SchedulerCommand>,
     ) -> std::io::Result<bool> {
-        handle_key(key, app, cmd_tx)
+        handle_key(key, app)
     }
 }
 
 pub fn handle_key(
     key: KeyCode,
     app: &mut AppState,
-    cmd_tx: &mpsc::Sender<SchedulerCommand>,
 ) -> std::io::Result<bool> {
     if let Some(binding) = KEY_BINDINGS.iter().find(|b| b.key == key) {
-        return handle_action(binding.action, app, cmd_tx);
+        return handle_action(binding.action, app);
     }
     if let KeyCode::Char(ch) = key {
         app.enqueue_event(crate::app::AppEvent::DraftInsertChar(ch));
@@ -106,9 +102,7 @@ pub fn handle_key(
 fn handle_action(
     action: Action,
     app: &mut AppState,
-    cmd_tx: &mpsc::Sender<SchedulerCommand>,
 ) -> std::io::Result<bool> {
-    let _ = cmd_tx;
     match action {
         Action::Close => app.enqueue_event(crate::app::AppEvent::CloseTaskInput),
         Action::SwitchField => app.enqueue_event(crate::app::AppEvent::DraftSwitchField),

@@ -4,10 +4,7 @@ pub mod task_input;
 
 use crossterm::event::KeyCode;
 use ratatui::Frame;
-use tokio::sync::mpsc;
-
 use crate::app::AppState;
-use crate::scheduler::SchedulerCommand;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ScreenId {
@@ -36,7 +33,6 @@ pub trait Screen {
         &self,
         key: KeyCode,
         app: &mut AppState,
-        cmd_tx: &mpsc::Sender<SchedulerCommand>,
     ) -> std::io::Result<bool>;
 }
 
@@ -53,9 +49,8 @@ fn current_screen(app: &AppState) -> &'static dyn Screen {
 pub fn dispatch_key(
     key: KeyCode,
     app: &mut AppState,
-    cmd_tx: &mpsc::Sender<SchedulerCommand>,
 ) -> std::io::Result<bool> {
-    current_screen(app).handle_key(key, app, cmd_tx)
+    current_screen(app).handle_key(key, app)
 }
 
 pub fn draw(frame: &mut Frame, app: &AppState) {

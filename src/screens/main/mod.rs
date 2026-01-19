@@ -3,10 +3,8 @@ pub mod fragments;
 use crossterm::event::KeyCode;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::Frame;
-use tokio::sync::mpsc;
 
 use crate::app::{AppEvent, AppState};
-use crate::scheduler::SchedulerCommand;
 use crate::screens::{FragmentId, KeyBinding, Screen};
 
 #[derive(Debug, Clone, Copy)]
@@ -75,19 +73,17 @@ impl Screen for MainScreen {
         &self,
         key: KeyCode,
         app: &mut AppState,
-        cmd_tx: &mpsc::Sender<SchedulerCommand>,
     ) -> std::io::Result<bool> {
-        handle_key(key, app, cmd_tx)
+        handle_key(key, app)
     }
 }
 
 pub fn handle_key(
     key: KeyCode,
     app: &mut AppState,
-    cmd_tx: &mpsc::Sender<SchedulerCommand>,
 ) -> std::io::Result<bool> {
     if let Some(binding) = KEY_BINDINGS.iter().find(|b| b.key == key) {
-        return handle_action(binding.action, app, cmd_tx);
+        return handle_action(binding.action, app);
     }
     Ok(false)
 }
@@ -95,9 +91,7 @@ pub fn handle_key(
 fn handle_action(
     action: Action,
     app: &mut AppState,
-    cmd_tx: &mpsc::Sender<SchedulerCommand>,
 ) -> std::io::Result<bool> {
-    let _ = cmd_tx;
     match action {
         Action::Quit => app.enqueue_event(AppEvent::Quit),
         Action::OpenTaskInput => app.enqueue_event(AppEvent::OpenTaskInput),
