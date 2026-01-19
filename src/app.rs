@@ -2,21 +2,7 @@ use std::collections::HashMap;
 
 use crate::scheduler::TaskUpdate;
 use crate::task::TaskSnapshot;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Activity {
-    Main,
-    TaskInput,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Fragment {
-    MainTasks,
-    MainDetail,
-    MainInput,
-    TaskDescription,
-    TaskHypotheses,
-}
+use crate::screens::{FragmentId, ScreenId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DraftField {
@@ -61,8 +47,8 @@ pub struct AppState {
     order: Vec<usize>,
     pub selected: usize,
     pub input: String,
-    pub activity: Activity,
-    pub fragment: Fragment,
+    pub screen: ScreenId,
+    pub fragment: FragmentId,
     pub draft: TaskDraft,
     pub cursor_pos: usize,
     pub cursor_visible: bool,
@@ -109,8 +95,8 @@ impl AppState {
             order: Vec::new(),
             selected: 0,
             input: String::new(),
-            activity: Activity::Main,
-            fragment: Fragment::MainTasks,
+            screen: ScreenId::Main,
+            fragment: FragmentId::MainTasks,
             draft,
             cursor_pos: 0,
             cursor_visible: true,
@@ -175,13 +161,13 @@ impl AppState {
         &self.logs
     }
 
-    pub fn set_fragment(&mut self, fragment: Fragment) {
+    pub fn set_fragment(&mut self, fragment: FragmentId) {
         self.fragment = fragment;
     }
 
     pub fn open_task_input(&mut self) {
-        self.activity = Activity::TaskInput;
-        self.fragment = Fragment::TaskDescription;
+        self.screen = ScreenId::TaskInput;
+        self.fragment = FragmentId::TaskDescription;
         self.draft.field = DraftField::Name;
         self.draft.heuristics_focus = HeuristicsFocus::Titles;
         self.input = self.draft.name.clone();
@@ -189,8 +175,8 @@ impl AppState {
     }
 
     pub fn close_task_input(&mut self) {
-        self.activity = Activity::Main;
-        self.fragment = Fragment::MainTasks;
+        self.screen = ScreenId::Main;
+        self.fragment = FragmentId::MainTasks;
         self.input.clear();
         self.cursor_pos = 0;
     }
