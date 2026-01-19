@@ -7,8 +7,8 @@ use ratatui::Frame;
 use crate::task::{TaskPhase, TaskStatus};
 
 pub fn draw_splash(frame: &mut Frame) {
-    let block = Block::default().borders(Borders::ALL).title("TheLastMachine");
-    let text = Text::from(vec![Line::from(" TheLastMachine")]);
+    let block = Block::default().borders(Borders::ALL).title("---");
+    let text = Text::from(vec![Line::from(" Revolver")]);
     let paragraph = Paragraph::new(text)
         .block(block)
         .alignment(Alignment::Center);

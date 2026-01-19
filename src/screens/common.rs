@@ -6,10 +6,10 @@ use ratatui::Frame;
 
 pub fn draw_header(frame: &mut Frame, area: Rect) {
     let text = Text::from(Line::from(Span::styled(
-        "TheLastMachine",
+        "Revolver",
         Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
     )));
-    let block = Block::default().borders(Borders::ALL).title("Header");
+    let block = Block::default().borders(Borders::ALL).title("---");
     frame.render_widget(Paragraph::new(text).alignment(Alignment::Center).block(block), area);
 }
 
